@@ -1,0 +1,29 @@
+services:
+  lead-router:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_PATH: /data/lead_router.db
+    volumes:
+      - lead-data:/data
+    restart: unless-stopped
+
+  # Optional: start with `docker compose --profile n8n up`, import
+  # n8n/lead-router-workflow.json, and set in .env:
+  #   DESTINATIONS={"n8n": "http://n8n:5678/webhook/lead-router"}
+  n8n:
+    image: n8nio/n8n:latest
+    profiles: ["n8n"]
+    ports:
+      - "5678:5678"
+    environment:
+      GENERIC_TIMEZONE: Asia/Kolkata
+    volumes:
+      - n8n-data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  lead-data:
+  n8n-data:

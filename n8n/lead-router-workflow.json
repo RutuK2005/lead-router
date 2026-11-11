@@ -1,0 +1,206 @@
+{
+  "name": "Lead Router - route scored leads",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-router",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "8f1c2a10-0001-4c4e-9a11-000000000001",
+      "name": "Lead Router Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "4b6f0c1e-0001-4d6a-8f3e-00000000a001"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "lead_id", "value": "={{ $json.body.lead.id }}", "type": "string" },
+            { "id": "a2", "name": "received_at", "value": "={{ $json.body.lead.received_at }}", "type": "string" },
+            { "id": "a3", "name": "source", "value": "={{ $json.body.lead.source }}", "type": "string" },
+            { "id": "a4", "name": "name", "value": "={{ $json.body.lead.name }}", "type": "string" },
+            { "id": "a5", "name": "phone", "value": "={{ $json.body.lead.phone }}", "type": "string" },
+            { "id": "a6", "name": "email", "value": "={{ $json.body.lead.email }}", "type": "string" },
+            { "id": "a7", "name": "city", "value": "={{ $json.body.lead.city }}", "type": "string" },
+            { "id": "a8", "name": "interest", "value": "={{ $json.body.lead.interest }}", "type": "string" },
+            { "id": "a9", "name": "intent", "value": "={{ $json.body.lead.classification.intent }}", "type": "string" },
+            { "id": "a10", "name": "category", "value": "={{ $json.body.lead.classification.interest_category }}", "type": "string" },
+            { "id": "a11", "name": "summary", "value": "={{ $json.body.lead.classification.summary }}", "type": "string" },
+            { "id": "a12", "name": "follow_up", "value": "={{ $json.body.lead.classification.suggested_follow_up }}", "type": "string" },
+            { "id": "a13", "name": "utm_campaign", "value": "={{ $json.body.lead.utm_campaign }}", "type": "string" },
+            { "id": "a14", "name": "idempotency_key", "value": "={{ $json.headers['idempotency-key'] }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8f1c2a10-0002-4c4e-9a11-000000000002",
+      "name": "Flatten lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "c-hot",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "hot",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "hot"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "c-warm",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "warm",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "warm"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "c-cold",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "cold",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cold"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "8f1c2a10-0003-4c4e-9a11-000000000003",
+      "name": "Route by intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-YOUR-WHATSAPP-OR-NOTIFICATION-WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: `HOT lead: ${$json.name} (${$json.phone}) - ${$json.summary} Next: ${$json.follow_up}` }) }}",
+        "options": {}
+      },
+      "id": "8f1c2a10-0004-4c4e-9a11-000000000004",
+      "name": "Notify front desk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "REPLACE_WITH_SPREADSHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Hot Leads" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [] },
+        "options": {}
+      },
+      "id": "8f1c2a10-0005-4c4e-9a11-000000000005",
+      "name": "Append to Hot Leads sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [700, 260],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_ME", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "REPLACE_WITH_SPREADSHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Warm Leads" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [] },
+        "options": {}
+      },
+      "id": "8f1c2a10-0006-4c4e-9a11-000000000006",
+      "name": "Append to Warm Leads sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [700, 420],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_ME", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "REPLACE_WITH_SPREADSHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Nurture List" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [] },
+        "options": {}
+      },
+      "id": "8f1c2a10-0007-4c4e-9a11-000000000007",
+      "name": "Add to nurture list",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [700, 580],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_ME", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "8f1c2a10-0008-4c4e-9a11-000000000008",
+      "name": "Ignore other intents",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [700, 740]
+    }
+  ],
+  "connections": {
+    "Lead Router Webhook": {
+      "main": [[{ "node": "Flatten lead", "type": "main", "index": 0 }]]
+    },
+    "Flatten lead": {
+      "main": [[{ "node": "Route by intent", "type": "main", "index": 0 }]]
+    },
+    "Route by intent": {
+      "main": [
+        [
+          { "node": "Notify front desk", "type": "main", "index": 0 },
+          { "node": "Append to Hot Leads sheet", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Append to Warm Leads sheet", "type": "main", "index": 0 }],
+        [{ "node": "Add to nurture list", "type": "main", "index": 0 }],
+        [{ "node": "Ignore other intents", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}
