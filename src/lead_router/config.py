@@ -13,7 +13,12 @@ class Settings(BaseSettings):
     e.g. `DESTINATIONS='{"crm": "https://example.com/hook"}'`.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        env_ignore_empty=True,  # `ANTHROPIC_API_KEY=` (empty) means "not set", not ""
+    )
 
     # Storage
     database_path: str = "lead_router.db"

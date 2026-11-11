@@ -33,6 +33,7 @@ def make_lead(**overrides) -> Lead:
         ({"message": "What is the price? Can I book this week?"}, Intent.HOT),
         ({"message": "What is the price?", "phone": None}, Intent.WARM),
         ({}, Intent.WARM),
+        ({"message": "Just exploring options, what is the cost?"}, Intent.COLD),
         ({"phone": None, "interest": None, "message": None}, Intent.COLD),
         ({"phone": None, "email": None}, Intent.SPAM),
         ({"message": "We sell SEO backlinks, see https://example.com"}, Intent.SPAM),
