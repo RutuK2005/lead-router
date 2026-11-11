@@ -1,0 +1,24 @@
+# Environments and secrets
+.venv/
+venv/
+.env
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Local databases
+*.db
+*.db-journal
+*.sqlite3
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
