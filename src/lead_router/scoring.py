@@ -14,6 +14,10 @@ HOT_PHRASES = (
     "today", "tomorrow", "asap", "urgent", "this week", "book", "appointment",
     "slot", "available", "price", "cost", "how much", "emi", "consultation",
 )
+COLD_PHRASES = (
+    "just exploring", "just checking", "just researching", "not now", "maybe later",
+    "next year", "few months",
+)
 SPAM_PHRASES = (
     "seo", "backlink", "crypto", "bitcoin", "loan offer", "casino", "guest post",
     "marketing services", "website development", "http://", "https://", "www.",
@@ -81,6 +85,8 @@ class RuleBasedScorer:
 
         if is_obvious_spam(lead):
             intent = Intent.SPAM
+        elif _contains_any(message, COLD_PHRASES):
+            intent = Intent.COLD
         elif _contains_any(message, HOT_PHRASES):
             # Urgency without a phone number is hard to act on quickly, so cap it at warm.
             intent = Intent.HOT if lead.phone else Intent.WARM
