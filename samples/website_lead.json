@@ -1,0 +1,13 @@
+{
+  "form_id": "contact-hair-clinic",
+  "submitted_at": "2026-11-10T11:02:10+05:30",
+  "page_url": "https://clinic.example.com/hair-prp?utm_source=google&utm_medium=cpc&utm_campaign=prp-nov&utm_content=ad-variant-b",
+  "fields": {
+    "name": "kabir mehta",
+    "phone": "+91 98765 43211",
+    "email": "kabir.mehta@example.org",
+    "city": "Mumbai",
+    "treatment": "Hair PRP",
+    "message": "Noticing hair thinning for a year. Just exploring options for now."
+  }
+}
