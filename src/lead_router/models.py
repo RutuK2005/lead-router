@@ -49,8 +49,10 @@ class OutboxStatus(StrEnum):
     DEAD = "dead"
 
 
+# This model's JSON schema is sent to Claude as the structured output format, so the
+# docstring and field descriptions are written for the model, not just for developers.
 class Classification(BaseModel):
-    """Structured triage result. This exact schema is sent to Claude as the output format."""
+    """Triage result for one inbound clinic lead."""
 
     intent: Intent = Field(
         description=(
