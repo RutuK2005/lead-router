@@ -9,7 +9,7 @@ schema-validated structured output, and a deterministic rule-based scorer takes 
 there's no API key or the call fails. Delivery uses a transactional outbox with retries,
 exponential backoff and a dead-letter state, so a lead is never lost because a destination
 was down for a few minutes. The project is modelled on the kind of clinic lead-automation
-work I do with Python and n8n.
+work I do with Python and n8n. 
 
 ## Architecture
 
