@@ -1,5 +1,7 @@
 # lead-router
-1000
+
+[![CI](https://github.com/RutuK2005/lead-router/actions/workflows/ci.yml/badge.svg)](https://github.com/RutuK2005/lead-router/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A small webhook service that takes in leads from ad and form sources (Meta lead ads, website
 contact forms, any flat JSON), cleans them up, scores them with an LLM, and forwards them to
 downstream tools like a CRM, a WhatsApp/notification webhook, or Google Sheets via n8n.
