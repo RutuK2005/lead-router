@@ -1,19 +1,10 @@
 # lead-router
 
-[![CI](https://github.com/RutuK2005/lead-router/actions/workflows/ci.yml/badge.svg)](https://github.com/RutuK2005/lead-router/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/RutuK2005/lead-router/actions/workflows/ci.yml/badge.svg)](https://github.com/RutuK2005/lead-router/actions/workflows/ci.yml)
 
-A webhook service for incoming leads. It takes leads from Meta lead ads, website forms or any flat JSON, cleans them up, scores them, and forwards them to a CRM or an n8n workflow.
+A small FastAPI service that receives leads from Meta lead ads, website forms or any flat JSON webhook, cleans them up, scores them and forwards them to a CRM or an n8n workflow.
 
-I do a lot of clinic lead automation in n8n, and the same problems keep coming up: duplicate leads, phone numbers in five different formats, junk submissions, and leads that silently disappear when the CRM webhook is down for a few minutes. This is my attempt at handling all of that properly in one small Python service.
-
-## What it does
-
-- Checks an HMAC signature (plus a timestamp, so old requests can't be replayed) on every incoming webhook
-- Maps each source's payload into one `Lead` model
-- Normalises phone numbers to E.164 (India by default), validates emails, fixes name casing
-- Drops duplicates by phone/email within a 24h window
-- Scores each lead as hot / warm / cold / spam with Claude, using structured output so the reply always matches a schema. With no API key, or if the call fails, it falls back to a simple rule-based scorer
-- Saves the lead and its delivery jobs in one SQLite transaction (outbox pattern), and a background worker delivers them with retries and exponential backoff. Deliveries that keep failing end up as "dead" so they can be re-sent later
+I do a lot of clinic lead automation in n8n, and the same problems keep coming up: people submitting the same form twice, phone numbers in five different formats, junk from SEO agencies, and leads that quietly disappear because the CRM webhook was down for a few minutes. I wanted one small Python service that deals with all of that before a lead reaches n8n.
 
 ```mermaid
 flowchart LR
@@ -27,7 +18,7 @@ flowchart LR
 
 ## Running it
 
-Python 3.12+.
+You need Python 3.12 or newer. An API key is optional: without one, every lead goes through the rule-based scorer.
 
 ```bash
 python -m venv .venv
@@ -36,24 +27,51 @@ pip install -e ".[dev]"
 cp .env.example .env
 ```
 
-Then in three terminals:
+Then, from the repo root, in three terminals:
 
 ```bash
-python scripts/mock_destination.py --port 9000 --fail-first 1   # fake CRM, fails once so you see a retry
+python scripts/mock_destination.py --port 9000 --fail-first 1   # fake CRM that fails once
 uvicorn lead_router.main:create_app --factory --port 8000
-python scripts/send_sample.py meta                              # also: website, generic
+python scripts/send_sample.py meta                              # or: website, generic
 ```
 
-`curl localhost:8000/leads` shows what came in and where it went. `/metrics` has counts, and `/docs` has the full API. There's also a `docker-compose.yml`, which can start n8n next to the service. The workflow to import is in `n8n/lead-router-workflow.json`.
+The fake CRM answers the first delivery with a 503, so you can watch the worker retry a second or two later and succeed. To see what happened:
 
-Settings are environment variables, listed in `.env.example`. The important ones are `WEBHOOK_SECRETS`, `DESTINATIONS` and `ANTHROPIC_API_KEY` (optional).
+```bash
+curl localhost:8000/leads               # stored leads with their score and status
+curl localhost:8000/leads/<lead_id>     # one lead plus the state of each delivery
+curl localhost:8000/metrics             # counts by status, intent and source
+```
 
-## Notes
+`localhost:8000/docs` has the full API. To send a different payload, pass `--file`, for example `python scripts/send_sample.py generic --file samples/spam_lead.json`.
 
-- Delivery is at-least-once, so a lead can occasionally be sent twice. Every request carries an `Idempotency-Key` so the receiving side can ignore repeats.
-- Scoring happens inside the webhook request, so with the LLM turned on the response waits for the model (20s timeout). Moving it into the worker would make responses faster.
-- The worker runs inside the API process and assumes a single instance. Running more than one would need Postgres with row locking, or a proper queue.
-- Real Meta webhooks only send a `leadgen_id`. The usual setup is an n8n flow that fetches the full lead from the Graph API and forwards it here.
+All settings are environment variables, listed with comments in `.env.example`. The ones you'll actually change are `WEBHOOK_SECRETS` (one HMAC secret per source), `DESTINATIONS` (where leads get forwarded) and `ANTHROPIC_API_KEY`, which turns on LLM scoring.
+
+There's also a Dockerfile and a `docker-compose.yml` that can start n8n next to the service with `docker compose --profile n8n up`. The n8n workflow to import is `n8n/lead-router-workflow.json`: it puts hot leads in a sheet and pings a notification webhook, warm leads go to another sheet and cold ones to a nurture list.
+
+## How it works
+
+Every `POST /webhooks/{source}` goes through the same steps:
+
+1. The sender signs `<timestamp>.<body>` with HMAC-SHA256 and sends it in `X-Timestamp` and `X-Signature`. A request whose timestamp is more than 5 minutes off is rejected, and so is any source with no secret configured.
+2. An adapter for that source maps the payload onto one `Lead` model.
+3. Cleaning turns phones into E.164 (India is the default region), validates emails and fixes name casing. Bad values are dropped and noted in `issues` instead of rejecting the lead, because a lead with a broken email but a good phone is still worth a call.
+4. If the same phone or email came in during the last 24 hours, the new lead is saved as a duplicate and not scored or forwarded again.
+5. The lead is scored as hot, warm, cold or spam, with a treatment category, a one-line summary and a suggested follow-up. If `ANTHROPIC_API_KEY` is set, Claude (`claude-haiku-5-5` by default) does this with structured outputs, so the reply has to fit the `Classification` schema. If there's no key, the call fails or the lead is obvious spam, the keyword scorer in `scoring.py` takes over, so an API outage doesn't stop leads coming in.
+6. The lead and one outbox row per destination are written in a single SQLite transaction. Spam is kept but not forwarded unless `FORWARD_SPAM=true`.
+
+A worker running inside the app checks the outbox every 2 seconds and POSTs each due row with an `Idempotency-Key` header. 408, 429, 5xx and network errors are retried with exponential backoff: the delay starts at 2 s, doubles each time up to 300 s, and is jittered between half and the full value. Any other 4xx, or a sixth failed attempt, marks the delivery as dead. `POST /leads/{id}/redeliver` queues it again once the destination is fixed.
+
+## What the samples do
+
+Here's what the rule-based scorer does with the four files in `samples/` (no API key set):
+
+- `meta_lead.json`: asks about aligner cost and a consultation this week, so it's **hot** (dental). The phone `098765 43210` comes out as `+919876543210`.
+- `website_lead.json`: says "just exploring options for now", so it's **cold** (hair).
+- `generic_lead.json`: has a phone and a treatment but no urgency words, so it's **warm** (dermatology).
+- `spam_lead.json`: no phone, an SEO offer and a link, so it's **spam**. It's stored but nothing is sent to the CRM.
+
+Sending the same sample twice within 24 hours gives `"status": "duplicate"` and no new delivery.
 
 ## Tests
 
@@ -62,12 +80,15 @@ pytest
 ruff check .
 ```
 
-No network or API key needed; the Claude client and HTTP destinations are mocked.
+There are 63 tests covering signatures and replays, the adapters, cleaning, both scorers, the retry logic and the API. The Anthropic client and the destinations are mocked, so they don't need a network connection or an API key. CI runs them on Python 3.12 and 3.13.
 
-## TODO
+## Limitations and next steps
 
-- Native Meta signature (`X-Hub-Signature-256`) and Graph API fetch
-- Move scoring into the worker
-- Per-CRM field mapping
+Things I know are missing or would change:
 
-All names and numbers in `samples/` are made up.
+- Delivery is at-least-once. If the CRM accepts a lead but the response is lost, the lead gets sent again, so the receiver should use the `Idempotency-Key` to ignore repeats.
+- Scoring happens inside the webhook request, so with the LLM on, the sender waits for the model (20 s timeout). I'd like to move scoring into the worker so the webhook can answer straight away.
+- The worker runs in the API process and assumes a single instance. Running more than one would need Postgres with row locking, or a proper queue.
+- Real Meta webhooks only send a `leadgen_id`, not the form answers. For now an n8n flow has to fetch the lead from the Graph API and forward it here. Next I want to check Meta's own `X-Hub-Signature-256` and do that fetch here, and add per-CRM field mapping.
+
+All names and numbers in `samples/` are made up. MIT licensed.
