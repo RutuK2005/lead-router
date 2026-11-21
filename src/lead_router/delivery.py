@@ -30,9 +30,8 @@ def compute_backoff(
 ) -> float:
     """Seconds to wait before retry number `attempt` (1-based).
 
-    Exponential growth (base, 2*base, 4*base, ...) capped at `cap`, with "equal jitter":
-    half the delay is fixed and half is random. Jitter stops many failed deliveries from
-    retrying in lock-step and hammering a destination that is just recovering.
+    Exponential (base, 2*base, 4*base, ...) capped at `cap`, with "equal jitter": half the
+    delay is fixed and half is random, so failed deliveries don't all retry at once.
     """
     rng = rng or random.Random()
     delay = min(cap, base * 2 ** (attempt - 1))

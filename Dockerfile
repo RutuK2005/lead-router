@@ -6,7 +6,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install dependencies first so this layer is cached between code changes.
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .

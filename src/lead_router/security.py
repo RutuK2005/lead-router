@@ -5,8 +5,7 @@ Scheme (used for both inbound verification and outbound signing):
     X-Timestamp: <unix seconds>
     X-Signature: sha256=<hex(HMAC_SHA256(secret, f"{timestamp}.{raw_body}"))>
 
-Signing the timestamp together with the body means an attacker cannot re-use an old
-signature with a fresh timestamp, and the tolerance window rejects old captured requests.
+The timestamp is part of the signed message, so it can't be changed without re-signing.
 """
 
 import hashlib
@@ -63,7 +62,6 @@ def verify_signature(
         raise SignatureError("timestamp outside tolerance window")
 
     expected = compute_signature(secret, timestamp, body)
-    # compare_digest takes the same time whether the first or last byte differs,
-    # so response timing can't be used to guess the signature byte by byte.
+    # constant-time compare
     if not hmac.compare_digest(expected, signature.strip()):
         raise SignatureError("signature mismatch")

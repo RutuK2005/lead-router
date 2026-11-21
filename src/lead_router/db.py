@@ -1,8 +1,7 @@
 """SQLite storage for leads and the delivery outbox (stdlib `sqlite3`, no ORM).
 
-The key idea is the *transactional outbox*: a lead and the outbox rows describing where it
-must be delivered are written in ONE transaction. Either both exist or neither does, so a
-crash can never leave a saved lead that nobody will deliver.
+A lead and its outbox rows (one per destination) are written in the same transaction, so a
+crash can't leave a saved lead that never gets delivered.
 """
 
 import json
@@ -73,7 +72,7 @@ class Database:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         try:
-            with conn:  # the connection context manager commits or rolls back
+            with conn:
                 yield conn
         finally:
             conn.close()

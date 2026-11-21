@@ -1,8 +1,7 @@
 """LLM lead classifier using the Anthropic SDK's structured outputs.
 
-`client.messages.parse(output_format=Classification)` sends the pydantic model's JSON schema
-to the API, which constrains the reply to that schema. The SDK then validates the reply back
-into a `Classification` instance, so the rest of the app never handles free-form text.
+`messages.parse(output_format=Classification)` constrains the reply to the pydantic schema
+and returns a validated `Classification`, so there's no free-form text to parse.
 """
 
 import json
